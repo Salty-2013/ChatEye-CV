@@ -55,5 +55,3 @@ This project is still under development. Further improvements are planned for pr
 ## 💡 Motivation
 
 I built ChatEye as part of my journey into Artificial Intelligence and Computer Vision. Rather than relying entirely on pretrained models, I want to learn how vision models work by building, testing, and improving my own.
-
-**This is only the beginning of ChatEye.** 🚀
