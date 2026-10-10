@@ -1,0 +1,145 @@
+ChatEye Mark 1
+
+import numpy as np
+import os
+import cv2
+from PIL import Image
+import torch as tch
+import torch.nn as nn
+
+##Model name: ChatEye##
+
+#SETTINGS 
+epochs = 1000
+Dataset = "DATASET"
+Image_list = []
+File_list = os.listdir(Dataset)
+Camera = cv2.VideoCapture(0)
+
+#DATA TRAINING
+Label_list = [] 
+for Images in File_list:
+    if Images.endswith((".jfif", ".png", ".jpeg", ".jpg")):
+        Full_path = os.path.join(Dataset, Images)
+
+        if Images.startswith("Cat"):
+            Label = 0
+        elif Images.startswith("Human"):
+            Label = 1
+        elif Images.startswith("Pencil"):
+            Label = 2
+        elif Images.startswith("Bottle"):
+            Label = 3
+        elif Images.startswith("Phone"):
+            Label = 4
+        elif Images.startswith("Laptop"):
+            Label = 5
+        else:
+            continue
+
+        img = Image.open(Full_path)
+        img_rgb = img.convert("RGB")
+        img_resized = img_rgb.resize((64, 64))
+        img_array = np.array(img_resized)
+        Image_list.append(img_array)
+        Label_list.append(Label)
+Final_Dataset = np.array(Image_list)
+Dataset_remake = np.transpose(Final_Dataset, (0, 3, 1, 2))
+Pytorch_Dataset = tch.tensor(Dataset_remake, dtype = tch.float32) / 255.0
+pyt_Images = Pytorch_Dataset.shape[0]
+Labels = tch.tensor(Label_list, dtype=tch.long)
+
+#ChatEye brain
+class ChatEye(nn.Module):
+    def __init__(self):
+        super(ChatEye, self).__init__()
+
+        self.conv1 = nn.Conv2d(3, 32, kernel_size = 3, padding = 1)
+        self.bn1 = nn.BatchNorm2d(32)
+
+        self.conv2 = nn.Conv2d(32, 64, kernel_size = 3, padding = 1)
+        self.bn2 = nn.BatchNorm2d(64)
+
+        self.pool = nn.MaxPool2d(2, 2)
+        self.dropout = nn.Dropout(0.25)
+        self.fc = nn.Linear(64 * 16 * 16, 6)
+
+    def forward(self, x):
+        # Laluan Blok 1
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = tch.relu(x)
+        x = self.pool(x)
+        
+            # Laluan Blok 2 (Seni bina mula memanjang)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = tch.relu(x)
+        x = self.pool(x)
+        
+        x = self.dropout(x)
+        
+        # Ratakan data dan buat keputusan
+        x = x.reshape(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+model = ChatEye()
+
+optimizer = tch.optim.AdamW(model.parameters(), lr=0.00001, weight_decay = 0.01)
+criterion = nn.CrossEntropyLoss()
+print(model)
+
+#TRAINING 
+for epoch in range(epochs):
+    model.train()
+    optimizer.zero_grad(set_to_none = True)
+
+    logits = model(Pytorch_Dataset)
+    Loss = criterion(logits, Labels)
+
+    Loss.backward()
+    optimizer.step()
+
+    if epoch % 100 == 0:
+        print(f"Epoch {epoch}, ChatEye Loss: {Loss.item():.4f}")
+
+tch.save(model.state_dict(), "CV MEMORY/ChatEye.pt")
+print("ChatEye BRAIN has been trained and saved!")
+
+model.eval()
+
+label_name = {
+    0: "Cat",
+    1: "Human",
+    2: "Pencil",
+    3: "Bottle",
+    4: "Phone",
+    5: "Laptop"
+}
+
+#CAMERA 
+while True:
+    Success, CV = Camera.read()
+    if not Success:
+        print("No camera detected!")
+        break
+    Frame_rgb = cv2.cvtColor(CV, cv2.COLOR_BGR2RGB)
+    Img_pil = Image.fromarray(Frame_rgb)
+    Img_resized = Img_pil.resize((64, 64))
+    Img_tensor = tch.tensor(np.array(Img_resized), dtype=tch.float32).permute(2, 0, 1).unsqueeze(0)
+
+    with tch.no_grad():
+        outputs = model(Img_tensor)
+        ID_Guess = tch.argmax(outputs, dim=1).item()
+        Text_Decided = label_name[ID_Guess]
+
+        cv2.putText(CV, f"ChatEye Cam: {Text_Decided}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    cv2.imshow("ChatEye", CV)
+    if cv2.waitKey(1) & 0xFF == ord('x'):
+        break
+    
+
+Camera.release()
+cv2.destroyAllWindows()
